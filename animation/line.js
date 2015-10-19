@@ -205,6 +205,10 @@ function calcEqInverse(eq, crd) {
 function calCnst(grad, crd) {
     return crd.y - (grad * crd.x);
 }
+function moveEq(eq, crd) {
+    var cnst = crd.y - (eq.grad * crd.x);
+    return lineEq(eq.grad, cnst);
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -330,44 +334,55 @@ function curvePath(crds, step_size) {
                     // Curve between the two crds must be split into two with
                     // Mid tangent line being the mean acute angle of this and
                     // next tangents and placed at the mid point.
-                    var xcrd = coordsMidPoint(crds[i], crds[i+1]);
+                    var xcrd = this_line.midpoint();
                     // Create two joining lines from the tangent equations in
                     // order to use calcTangent which works with lines not eqs.
-                    if (crds[i].tng_eq.grad == crds[i+1].tng_eq.grad) {
-                        var tng_cnst = calCnst(crds[i].tng_eq.grad, xcrd);
-                        var xcrd_inv = lineEq(crds[i].tng_eq.grad, tng_cnst);
-                        var xcrd_tng = calcEqInverse(xcrd_inv, xcrd);
-                    }
-                    else {
-                        var jn_crd = solveEquations(
-                            crds[i].tng_eq,
-                            crds[i+1].tng_eq
-                        );
-                        if (jn_crd.x == 0.0) {
-                            var srtX = 1.0;
-                        }
-                        else {
-                            var srtX = 0.0;
-                        }
-                        var this_srtX = srtX;
-                        var this_srtY = crds[i].tng_eq.calcY(this_srtX);
-                        var next_srtX = srtX;
-                        var next_srtY = crds[i+1].tng_eq.calcY(next_srtX);
-                        var this_tng_eq_ln = line(
-                            coord(this_srtX, this_srtY),
-                            jn_crd
-                        );
-                        var next_tng_eq_ln = line(
-                            jn_crd,
-                            coord(next_srtX, next_srtY)
-                        );
-                        var jn_tng = calcTangent(
-                            this_tng_eq_ln,
-                            next_tng_eq_ln
-                        );
-                        var tng_cnst = calCnst(jn_tng.grad, xcrd);
-                        var xcrd_tng = lineEq(jn_tng.grad, tng_cnst);
-                    }
+                    
+                    // if (crds[i].tng_eq.grad == crds[i+1].tng_eq.grad) {
+                    //     var tng_cnst = calCnst(crds[i].tng_eq.grad, xcrd);
+                    //     var xcrd_inv = lineEq(crds[i].tng_eq.grad, tng_cnst);
+                    //     var xcrd_tng = calcEqInverse(xcrd_inv, xcrd);
+                    // }
+                    // else {
+                    //     var jn_crd = solveEquations(
+                    //         crds[i].tng_eq,
+                    //         crds[i+1].tng_eq
+                    //     );
+                    //     if (jn_crd.x == 0.0) {
+                    //         var srtX = 1.0;
+                    //     }
+                    //     else {
+                    //         var srtX = 0.0;
+                    //     }
+                    //     var this_srtX = srtX;
+                    //     var this_srtY = crds[i].tng_eq.calcY(this_srtX);
+                    //     var next_srtX = srtX;
+                    //     var next_srtY = crds[i+1].tng_eq.calcY(next_srtX);
+                    //     var this_tng_eq_ln = line(
+                    //         coord(this_srtX, this_srtY),
+                    //         jn_crd
+                    //     );
+                    //     var next_tng_eq_ln = line(
+                    //         jn_crd,
+                    //         coord(next_srtX, next_srtY)
+                    //     );
+                    //     var jn_tng = calcTangent(
+                    //         this_tng_eq_ln,
+                    //         next_tng_eq_ln
+                    //     );
+                    //     var tng_cnst = calCnst(jn_tng.grad, xcrd);
+                    //     var xcrd_tng = lineEq(jn_tng.grad, tng_cnst);
+                    // }
+                    
+                    var sec1mid = coordsMidPoint(crds[i], xcrd);
+                    var sec2mid = coordsMidPoint(xcrd, crds[i+1]);
+                    var sec1tng = this_line.inverse(sec1mid);
+                    var sec2tng = this_line.inverse(sec2mid);
+                    var tng_ln_srt = solveEquations(crds[i].tng_eq, sec1tng);
+                    var tng_ln_end = solveEquations(crds[i+1].tng_eq, sec2tng);
+                    var pre_tng_ln = line(tng_ln_srt, tng_ln_end);
+                    var xcrd_tng = moveEq(pre_tng_ln.eq(), xcrd);
+                    
                     xcrd.tng_eq = xcrd_tng;
                     xcrd.dir_switch = true;
 
