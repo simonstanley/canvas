@@ -2,7 +2,7 @@ $( document ).ready(function() {
 
   var canvas = document.getElementById('canvas');
   var ctx = canvas.getContext('2d');
-  var glob_radius = 7;
+  var glob_radius = 4;
   var shapes = [];
   var frame = 0;
 
@@ -167,7 +167,7 @@ $( document ).ready(function() {
       return num;
   }
 
-  var color = {'r': 0, 'b': 0, 'g': 0, 'a': 0.9}
+  var color = {'r': 0, 'b': 0, 'g': 0, 'a': 1}
   var ball = createCanvasBall(
     x=0.1,
     y=0.8,
@@ -179,14 +179,47 @@ $( document ).ready(function() {
     color=color
   );
 
-  var crd1 = coord(0.2,0.2);
-  var crd2 = coord(0.3,0.6);
-  var crd3 = coord(0.7,0.5);
-  var crdi = coord(0.6,0.3);
-  var crd4 = coord(0.4,0.3);
-  var crd5 = coord(0.6,0.5);
+  var step_size = 0.03;
+  var path_coords = [];
 
-  var path_coords = curvePath([crd1, crd2, crd3, crdi, crd4, crd5], 0.01);
+  var crd1 = coord(0.2,0.7);
+  var crd2 = coord(0.6,0.7);
+  var crd3 = coord(0.6,0.3);
+  var crd4 = coord(0.2,0.3);
+  var crd5 = coord(0.2,0.7);
+  var mrkrs = [crd1, crd2, crd3, crd4, crd5];
+  var path_crds1 = curvePath(mrkrs, step_size);
+  path_coords = path_coords.concat(path_crds1);
+
+
+
+  // var crd5 = coord(0.6,0.5);
+  // var crd6 = coord(0.4,0.3);
+  // var crd7 = coord(0.2,0.5);
+  // mrkrs = mrkrs.concat([crd4, crd5, crd6, crd7]);
+  // var path_crds2 = curvePath([crd4, crd5, crd6, crd7], step_size);
+  // path_coords = path_coords.concat(path_crds2);
+
+
+  for (i = 0; i < mrkrs.length; i++) {
+      var mrk_clr = {'r': 255, 'b': 0, 'g': 0, 'a': 1}
+      var mrkr = createCanvasBall(
+        x=mrkrs[i].x,
+        y=mrkrs[i].y,
+        vx=0.2,
+        vy=0.2,
+        ax=0,
+        ay=0,
+        radius=glob_radius+1,
+        color=mrk_clr
+      );
+      mrkr = percentToPxlPosition(
+        mrkr,
+        mrkrs[i].x,
+        mrkrs[i].y
+      )
+      mrkr.draw();
+  }
 
   animate();
 });

@@ -4,6 +4,8 @@
  *
  */
 
+var rnd_prc = 5;
+
 ///////////////////////////////////////////////////////////////////////////////
 /*
  * COORDINATE
@@ -11,8 +13,8 @@
 function coord(x, y) {
     // Single point in 2D plane
     var coord = {
-        x: x,
-        y: y,
+        x: Number((x).toFixed(rnd_prc)),
+        y: Number((y).toFixed(rnd_prc)),
         addVector: function(vec) {
             return addVec(this, vec);
         },
@@ -45,8 +47,8 @@ function coordsMidPoint(coord1, coord2) {
 function vector(x, y) {
     // Single step in 2D plane
     var vec = {
-        x: x,
-        y: y,
+        x: Number((x).toFixed(rnd_prc)),
+        y: Number((y).toFixed(rnd_prc)),
         length: function() {
             return calcVecLength(this);
         },
@@ -62,7 +64,7 @@ function vector(x, y) {
 
 // FUNCTIONS //
 function calcVecLength(vec) {
-    return  Math.sqrt(Math.pow(vec.x, 2) + Math.pow(vec.y, 2));
+    return Math.sqrt(Math.pow(vec.x, 2) + Math.pow(vec.y, 2));
 }
 function calcUnitVec(vec) {
     return vector((vec.x / vec.length()), (vec.y / vec.length()));
@@ -105,9 +107,13 @@ function line(coord1, coord2) {
     return line;
 }
 
-// FUNCTIONS //
 function lineEq(grad, cnst, vline) {
     // Given by y = (grad * x) + cnst (unless its a vertical line)
+    // grad and cnst are null if its a vertical line.
+    if (vline == null) {
+        grad = Number((grad).toFixed(rnd_prc));
+        cnst = Number((cnst).toFixed(rnd_prc));
+    }
     var eq = {
         grad: grad,
         cnst: cnst,
@@ -121,6 +127,8 @@ function lineEq(grad, cnst, vline) {
     }
     return eq;
 }
+
+// FUNCTIONS //
 function calcLineEq(coord1, coord2) {
     if (coord1.x == coord2.x) {
       if (coord1.y == coord2.y) {
@@ -140,9 +148,9 @@ function calcLineEq(coord1, coord2) {
     }
     return lineEq(grad, cnst, vline);
 }
-function calcLineY(lineEq, x) {
-    if (lineEq.vline) {
-        if (lineEq.vline == x) {
+function calcLineY(eq, x) {
+    if (eq.vline) {
+        if (eq.vline == x) {
             // y can be any value.
             return inf;
         }
@@ -152,22 +160,22 @@ function calcLineY(lineEq, x) {
         }
     }
     else {
-        return (lineEq.grad * x) + lineEq.cnst;
+        return (eq.grad * x) + eq.cnst;
     }
 }
-function calcLineX(lineEq, y) {
-    if (lineEq.grad) {
+function calcLineX(eq, y) {
+    if (eq.grad) {
         // If grad is not null or 0.
-        return (y - lineEq.cnst) / lineEq.grad;
+        return (y - eq.cnst) / eq.grad;
     }
     else {
-        if (lineEq.grad == null) {
+        if (eq.grad == null) {
             // Dealing with vertical line.
             return vline;
         }
         else if (eq.grad == 0) {
             // Dealing with horizontal line.
-            if (y == lineEq.cnst) {
+            if (y == eq.cnst) {
                 // x can be any value.
                 return inf;
             }
@@ -183,7 +191,7 @@ function calcEqInverse(eq, crd) {
     if (eq.grad) {
       // If grad is not null or 0.
       var inv_grad = -1.0 / eq.grad;
-      var inv_cnst = calCnst(inv_grad, crd);
+      var inv_cnst = crd.y - (inv_grad * crd.x);
       var vline = null;
     }
     else {
@@ -201,9 +209,6 @@ function calcEqInverse(eq, crd) {
       }
     }
     return lineEq(inv_grad, inv_cnst, vline);
-}
-function calCnst(grad, crd) {
-    return crd.y - (grad * crd.x);
 }
 function moveEq(eq, crd) {
     var cnst = crd.y - (eq.grad * crd.x);
@@ -297,7 +302,7 @@ function calcQuadLength(srt, end, cntr) {
  */
 function curvePath(crds, step_size) {
     var path_crds = [];
-    var t_pos = 0;
+    var t_err_pct = 0.0;
     for (var i = 0; i < (crds.length - 1); i++) {
         // If change in direction is the same.
         // Establish the two tangent equations for this and next point.
@@ -335,45 +340,13 @@ function curvePath(crds, step_size) {
                     // Mid tangent line being the mean acute angle of this and
                     // next tangents and placed at the mid point.
                     var xcrd = this_line.midpoint();
-                    // Create two joining lines from the tangent equations in
-                    // order to use calcTangent which works with lines not eqs.
-                    
-                    // if (crds[i].tng_eq.grad == crds[i+1].tng_eq.grad) {
-                    //     var tng_cnst = calCnst(crds[i].tng_eq.grad, xcrd);
-                    //     var xcrd_inv = lineEq(crds[i].tng_eq.grad, tng_cnst);
-                    //     var xcrd_tng = calcEqInverse(xcrd_inv, xcrd);
-                    // }
-                    // else {
-                    //     var jn_crd = solveEquations(
-                    //         crds[i].tng_eq,
-                    //         crds[i+1].tng_eq
-                    //     );
-                    //     if (jn_crd.x == 0.0) {
-                    //         var srtX = 1.0;
-                    //     }
-                    //     else {
-                    //         var srtX = 0.0;
-                    //     }
-                    //     var this_srtX = srtX;
-                    //     var this_srtY = crds[i].tng_eq.calcY(this_srtX);
-                    //     var next_srtX = srtX;
-                    //     var next_srtY = crds[i+1].tng_eq.calcY(next_srtX);
-                    //     var this_tng_eq_ln = line(
-                    //         coord(this_srtX, this_srtY),
-                    //         jn_crd
-                    //     );
-                    //     var next_tng_eq_ln = line(
-                    //         jn_crd,
-                    //         coord(next_srtX, next_srtY)
-                    //     );
-                    //     var jn_tng = calcTangent(
-                    //         this_tng_eq_ln,
-                    //         next_tng_eq_ln
-                    //     );
-                    //     var tng_cnst = calCnst(jn_tng.grad, xcrd);
-                    //     var xcrd_tng = lineEq(jn_tng.grad, tng_cnst);
-                    // }
-                    
+
+                    // Split the line into two sections. Take the midpoint of
+                    // each line and calculate where adjecent line at midpoint
+                    // meets the tangent equation of its neighbouring point.
+                    // These two meeting points (from each section) give the
+                    // line with the required gradient for the new tng_eq at
+                    // the switch point.
                     var sec1mid = coordsMidPoint(crds[i], xcrd);
                     var sec2mid = coordsMidPoint(xcrd, crds[i+1]);
                     var sec1tng = this_line.inverse(sec1mid);
@@ -382,7 +355,7 @@ function curvePath(crds, step_size) {
                     var tng_ln_end = solveEquations(crds[i+1].tng_eq, sec2tng);
                     var pre_tng_ln = line(tng_ln_srt, tng_ln_end);
                     var xcrd_tng = moveEq(pre_tng_ln.eq(), xcrd);
-                    
+
                     xcrd.tng_eq = xcrd_tng;
                     xcrd.dir_switch = true;
 
@@ -423,14 +396,15 @@ function curvePath(crds, step_size) {
         // Calculate step sizes in t
         var t_step = step_size / quad_len;
         var t_crds = [];
+        var t_pos = t_step * t_err_pct;
         for (var t = t_pos; t < 1.0; t+=t_step) {
             t_crds.push(t);
         }
-        t_pos = t - 1.0;
+        t_err_pct = (t - 1.0) / t_step;
         for (var j = 0; j < t_crds.length; j++) {
             path_crds.push(quad_crv.calcCrd(t_crds[j]));
         }
-        //console.log("(" + crds[i].x + ", " + crds[i].y + ")");
+        console.log(crds[i].tng_eq);
         //console.log("y="+crds[i+1].tng_eq.grad+"x +"+crds[i+1].tng_eq.cnst);
     }
     return path_crds
@@ -526,6 +500,16 @@ function solveEquations(eq1, eq2) {
         // eq2 is vertical
         var x = eq2.vline;
         var y = eq1.calcY(x);
+    }
+    else if (eq1.grad == 0.0) {
+        // eq1 is horizontal
+        var y = eq1.cnst;
+        var x = eq2.calcX(y);
+    }
+    else if (eq2.grad == 0.0) {
+        // eq2 is horizontal
+        var y = eq2.cnst;
+        var x = eq1.calcX(y);
     }
     else {
         var y = (
