@@ -5,6 +5,8 @@ $( document ).ready(function() {
     var glob_radius = 2;
     var shapes = [];
     var frame = 0;
+    var frame_rate = 0.01;
+    var frame_spd = req_seg_len * (1.0 / frame_rate);
 
     function createCanvasBall (x, y, vx, vy, ax, ay, radius, color) {
     // A Canvas Ball is measured in 0-1 in width (x) and height (y) regardles
@@ -87,6 +89,16 @@ $( document ).ready(function() {
     }
 
     function animate() {
+
+        if (frame == 0) {
+            start_time = $.now();
+        }
+        if (!path_coords[Math.floor(frame)]) {
+            end_time = $.now();
+            var dif = end_time - start_time;
+
+            console.log(dif);
+        }
         //ctx.clearRect(0,0, canvas.width, canvas.height);
 
         // For full window.
@@ -95,13 +107,13 @@ $( document ).ready(function() {
 
         ball = percentToPxlPosition(
             ball,
-            path_coords[frame].x,
-            path_coords[frame].y
+            path_coords[Math.floor(frame)].x,
+            path_coords[Math.floor(frame)].y
         )
         ball.draw();
 
-        frame += 1;
-        if (frame < 1000) {
+        frame += path_coords[Math.floor(frame)].spd / frame_spd;
+        if (frame < 5000) {
             window.requestAnimationFrame(
                 function () {
                     animate();
@@ -192,6 +204,8 @@ $( document ).ready(function() {
         mrkr.draw();
     }
 
+    var start_time;
+    var end_time;
     var color = {'r': 0, 'b': 0, 'g': 0, 'a': 1}
     var ball = createCanvasBall(
     x=0.1,
@@ -208,6 +222,9 @@ $( document ).ready(function() {
     var path_crds;
     canvas.addEventListener("mousedown", getPosition, false);
 
+    var pnt_times = [0, 1, 2, 3, 4];
+    var t_indx = 0;
+
     function getPosition(event)
     {
         var x = event.x;
@@ -215,15 +232,14 @@ $( document ).ready(function() {
         x -= canvas.offsetLeft;
         y -= canvas.offsetTop;
 
-        // Translate x y into percent vals
-
-        var crd = coord(x, y);
+        var crd = coord(x, y, pnt_times[t_indx]);
         crd = PxlToPercentPosition(crd, x, y)
 
         mrkrs.push(crd);
         drawMarker(crd);
+        t_indx += 1;
 
-        if (mrkrs.length == 5) {
+        if (mrkrs.length == 4) {
             path_coords = curvePath(mrkrs);
             animate();
         }

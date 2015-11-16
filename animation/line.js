@@ -4,7 +4,7 @@
  *
  */
 
-var req_seg_len = 0.005
+var req_seg_len = 0.001;
 var rnd_prc = 6;
 var str_ln_damp_val = 1.2;
 
@@ -12,11 +12,15 @@ var str_ln_damp_val = 1.2;
 /*
  * COORDINATE
  */
-function coord(x, y) {
+function coord(x, y, t) {
     // Single point in 2D plane
+    if (t) {
+        t =  Number((t).toFixed(rnd_prc));
+    }
     var coord = {
         x: Number((x).toFixed(rnd_prc)),
         y: Number((y).toFixed(rnd_prc)),
+        t: t,
         addVector: function(vec) {
             return addVec(this, vec);
         },
@@ -288,8 +292,10 @@ function calcQuadX(quadEq, y) {
     // This is the quadratic formula.
     var p1 = Math.pow(quadEq.fac1, 2) - (4 * quadEq.fac2 * (quadEq.cnst - y));
     var p2 = 2 * quadEq.fac2;
-    var p12 = Math.sqrt(p1) / p2;
-    return [(-1.0 * quadEq.fac2) + p12, (-1.0 * quadEq.fac2) - p12];
+    return [
+        ((-1.0 * quadEq.fac1) + Math.sqrt(p1)) / p2,
+        ((-1.0 * quadEq.fac1) - Math.sqrt(p1)) / p2
+    ];
 }
 function calcQuadLength(srt, end, cntr) {
     // Ref: http://www.malczak.linuxpl.com/blog/quadratic-bezier-curve-length/
@@ -317,20 +323,25 @@ function calcQuadLength(srt, end, cntr) {
 /*
  * CURVED PATH
  */
-function curvePath(crds) {
-    var path_crds = [];
+function curvePath(mrkrs, init_sp) {
+    var crv_path = {};
+    crv_path.crds = [];
+    crv_path.lines = [];
+    crv_path.curves = [];
+
     var percnt_xtr = 0.0;
     var req_seg_len_int = 0.0;
-    for (var i = 0; i < (crds.length - 1); i++) {
+
+    for (var i = 0; i < (mrkrs.length - 1); i++) {
         // If change in direction is the same.
         // Establish the two tangent equations for this and next point.
         // Start by getting this and the next line.
-        var this_line = line(crds[i], crds[i+1]);
+        var this_line = line(mrkrs[i], mrkrs[i+1]);
         this_line.ln_eq = this_line.eq();
         var next_line;
-        if (i+2 < crds.length) {
+        if (i+2 < mrkrs.length) {
             // I.e i+1 is not the end point.
-            var next_line = line(crds[i+1], crds[i+2])
+            var next_line = line(mrkrs[i+1], mrkrs[i+2])
             next_line.ln_eq = next_line.eq();
         }
         else {
@@ -340,58 +351,104 @@ function curvePath(crds) {
             // Not end of path
 
             // If next coord is a normal (given) coord.
-            if (!crds[i+1].dir_switch) {
+            if (!mrkrs[i+1].dir_switch) {
 
                 // If this and next lines are straight
                 if (this_line.ln_eq.grad == next_line.ln_eq.grad) {
-                    if (crds[i].tng_eq) {
+                    if (mrkrs[i].tng_eq) {
                         // Mid path straight line
-                        if (crds[i].tng_eq.grad == this_line.ln_eq.grad) {
+                        if (mrkrs[i].tng_eq.grad == this_line.ln_eq.grad) {
                             // This tangent straight with line
-                            crds[i+1].tng_eq = crds[i].tng_eq;
-                            crds[i+1].dir_switch = true;
+                            mrkrs[i+1].tng_eq = mrkrs[i].tng_eq;
+                            mrkrs[i+1].dir_switch = true;
                         }
                         else {
                             // This tangent at angle
-                            crds[i+1].tng_eq = calcTngInverse(
+                            mrkrs[i+1].tng_eq = calcTngInverse(
                                 this_line,
                                 str_ln_damp_val
                             );
-                            crds[i+1].dir_switch = true;
+                            mrkrs[i+1].dir_switch = true;
                         }
                     }
                     else {
                         // Start of path straight line
-                        crds[i].tng_eq = this_line.ln_eq;
-                        crds[i].dir_switch = true;
-                        crds[i+1].tng_eq = this_line.ln_eq;
-                        crds[i+1].dir_switch = true;
+                        mrkrs[i].tng_eq = this_line.ln_eq;
+                        mrkrs[i].dir_switch = true;
+                        mrkrs[i+1].tng_eq = this_line.ln_eq;
+                        mrkrs[i+1].dir_switch = true;
                     }
                 }
                 // If this and next lines are angled.
                 else {
-                    crds[i+1].tng_eq = calcTangent(this_line, next_line);
+                    mrkrs[i+1].tng_eq = calcTangent(this_line, next_line);
                     // Establish the direction change of lines, lines are assigned a
                     // clockwise = true or false attribute.
-                    crds[i+1].clockwise = isClockwise(this_line, next_line);
+                    mrkrs[i+1].clockwise = isClockwise(this_line, next_line);
                 }
             }
 
-            if (!crds[i].tng_eq) {
+            if (!mrkrs[i].tng_eq) {
                 // Start of path non-straight path
                 var this_line_mid = this_line.midpoint();
-                crds[i].tng_eq = this_line.inverse(this_line_mid);
-                crds[i].clockwise = crds[i+1].clockwise;
+                mrkrs[i].tng_eq = this_line.inverse(this_line_mid);
+                mrkrs[i].clockwise = mrkrs[i+1].clockwise;
             }
             else {
                 // Mid path
-                if ((!crds[i].dir_switch && !crds[i+1].dir_switch) &&
-                    crds[i].clockwise != crds[i+1].clockwise) {
+                if ((!mrkrs[i].dir_switch && !mrkrs[i+1].dir_switch) &&
+                    mrkrs[i].clockwise != mrkrs[i+1].clockwise) {
                     // If change in direction changes.
-                    // Curve between the two crds must be split into two with
+                    // Curve between the two mrkrs must be split into two with
                     // Mid tangent line being the mean acute angle of this and
                     // next tangents and placed at the mid point.
                     var xcrd = this_line.midpoint();
+
+
+                    var next_quad_crd = solveEquations(mrkrs[i].tng_eq, mrkrs[i+1].tng_eq);
+                    var next_quad_crv = curvedLine(mrkrs[i+1], mrkrs[i+2], next_quad_crd);
+                    var full_quad_len = next_quad_crv.length() + quad_len;
+                    var secs = mrkrs[i+2].t - mrkrs[i].t;
+                    this_line.a = calcAcceleration(mrkrs[i].spd, full_quad_len, secs);
+
+                    mrkrs[i+1].spd = calcFinalSp(mrkrs[i].spd, this_line.a, secs);
+
+                    var secs = mrkrs[i+1].t - mrkrs[i].t;
+                    var line_acc;
+                    if (i == 0) {
+                        if (!init_sp) {
+                            line_acc = 0.0;
+                        }
+                        else {
+                            line_acc = calcAcceleration(init_sp, this_line.length(), secs);
+                        }
+                    }
+                    else {
+                        line_acc = calcAcceleration(mrkrs[i].spd, this_line.length(), secs);
+                    }
+                    var half_len = this_line.length() / 2.0;
+                    // d = vit + 1/2at^2
+                    var t_sols = quadEq(
+                        (line_acc * 0.5),
+                        mrkrs[i].spd,
+                        (-1.0 * half_len)).calcX(0.0);
+                    if (t_sols[0] > 0.0 && t_sols[1] > 0.0) {
+                        if (mrkrs[i].t + t_sols[0] < mrkrs[i+1].t) {
+                            xcrd.t = mrkrs[i].t + t_sols[0];
+                        }
+                        else {
+                            xcrd.t = mrkrs[i].t + t_sols[1];
+                        }
+                    }
+                    else {
+                        if (t_sols[0] > 0.0) {
+                            xcrd.t = mrkrs[i].t + t_sols[0];
+                        }
+                        else {
+                            // It is assumed this is positive
+                            xcrd.t = mrkrs[i].t + t_sols[1];
+                        }
+                    }
 
                     // Split the line into two sections. Take the midpoint of
                     // each line and calculate where adjecent line at midpoint
@@ -399,12 +456,12 @@ function curvePath(crds) {
                     // These two meeting points (from each section) give the
                     // line with the required gradient for the new tng_eq at
                     // the switch point.
-                    var sec1mid = coordsMidPoint(crds[i], xcrd);
-                    var sec2mid = coordsMidPoint(xcrd, crds[i+1]);
+                    var sec1mid = coordsMidPoint(mrkrs[i], xcrd);
+                    var sec2mid = coordsMidPoint(xcrd, mrkrs[i+1]);
                     var sec1tng = this_line.inverse(sec1mid);
                     var sec2tng = this_line.inverse(sec2mid);
-                    var tng_ln_srt = solveEquations(crds[i].tng_eq, sec1tng);
-                    var tng_ln_end = solveEquations(crds[i+1].tng_eq, sec2tng);
+                    var tng_ln_srt = solveEquations(mrkrs[i].tng_eq, sec1tng);
+                    var tng_ln_end = solveEquations(mrkrs[i+1].tng_eq, sec2tng);
                     var pre_tng_ln = line(tng_ln_srt, tng_ln_end);
                     var xcrd_tng = moveEq(pre_tng_ln.eq(), xcrd);
                     //var xcrd_tng = pre_tng_ln.eq();
@@ -413,14 +470,14 @@ function curvePath(crds) {
                     xcrd.dir_switch = true;
 
                     // Add the extra coord to the path and continue in loop.
-                    new_crds = [];
-                    for (var k = 0; k < crds.length; k++) {
-                        new_crds.push(crds[k]);
+                    new_mrkrs = [];
+                    for (var k = 0; k < mrkrs.length; k++) {
+                        new_mrkrs.push(mrkrs[k]);
                         if (k == i) {
-                            new_crds.push(xcrd);
+                            new_mrkrs.push(xcrd);
                         }
                     }
-                    crds = new_crds;
+                    mrkrs = new_mrkrs;
                     i-=1;
                     continue;
                 }
@@ -429,50 +486,115 @@ function curvePath(crds) {
         else {
             // End of path
             var this_line_mid = this_line.midpoint();
-            crds[i+1].tng_eq = this_line.inverse(this_line_mid);
-            crds[i+1].clockwise = crds[i].clockwise;
+            mrkrs[i+1].tng_eq = this_line.inverse(this_line_mid);
+            mrkrs[i+1].clockwise = mrkrs[i].clockwise;
         }
 
-        if (!crds[i].tng_eq) {
+        if (!mrkrs[i].tng_eq) {
             // Only two points
             var this_quad_crd = this_line.midpoint();
         }
         else {
-            if (crds[i].tng_eq.calcY(crds[i+1].x) == crds[i+1].y ||
-                crds[i].tng_eq.calcX(crds[i+1].y) == crds[i+1].x) {
+            if (mrkrs[i].tng_eq.calcY(mrkrs[i+1].x) == mrkrs[i+1].y ||
+                mrkrs[i].tng_eq.calcX(mrkrs[i+1].y) == mrkrs[i+1].x) {
                 var this_quad_crd = this_line.midpoint();
-                crds[i+1].tng_eq = this_line.ln_eq;
+                mrkrs[i+1].tng_eq = this_line.ln_eq;
             }
             else {
-                var this_quad_crd = solveEquations(crds[i].tng_eq, crds[i+1].tng_eq);
+                var this_quad_crd = solveEquations(mrkrs[i].tng_eq, mrkrs[i+1].tng_eq);
             }
         }
-        var quad_crv = curvedLine(crds[i], crds[i+1], this_quad_crd);
+        var quad_crv = curvedLine(mrkrs[i], mrkrs[i+1], this_quad_crd);
         var quad_len = quad_crv.length();
         if (!quad_len) {
             // Quad curve is straight line
             var quad_len = this_line.length();
         }
 
+        if (mrkrs[i+1].dir_switch) {
+            // Then mrkrs[i+1] has no t
+            // work out full curve.
+            var next_quad_crd = solveEquations(mrkrs[i+1].tng_eq, mrkrs[i+2].tng_eq);
+            var next_quad_crv = curvedLine(mrkrs[i+1], mrkrs[i+2], next_quad_crd);
+            var full_quad_len = next_quad_crv.length() + quad_len;
+            var secs = mrkrs[i+2].t - mrkrs[i].t;
+            this_line.a = calcAcceleration(mrkrs[i].spd, full_quad_len, secs);
+
+            mrkrs[i+1].spd = calcFinalSp(mrkrs[i].spd, this_line.a, secs);
+        }
+        else {
+            // Calculate acceleration value for this_line
+            var secs = mrkrs[i+1].t - mrkrs[i].t;
+            if (i == 0) {
+                if (!init_sp) {
+                    this_line.a = 0.0;
+                    mrkrs[i+1].spd = quad_len / secs;
+                }
+                else {
+                    this_line.a = calcAcceleration(init_sp, quad_len, secs);
+                    mrkrs[i+1].spd = calcFinalSp(init_sp, this_line.a, secs);
+                }
+            }
+            else {
+                this_line.a = calcAcceleration(mrkrs[i].spd, quad_len, secs);
+                mrkrs[i+1].spd = calcFinalSp(mrkrs[i].spd, this_line.a, secs);
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
         // t_step can be thought of as a percentage value.
         var t_step = Number((req_seg_len / quad_len).toFixed(8));
         if (req_seg_len_int > 0.0) {
-            // First point not at crds[i]
+            // The First point is not at mrkrs[i]
             // Initial t value.
             var t_val = t_step * percnt_xtr;
             var init_this_crd = quad_crv.calcCrd(t_val);
 
-            var act_seg_len = line(crds[i], init_this_crd).length();
+            var act_seg_len = line(mrkrs[i], init_this_crd).length();
             var t_adj_val = req_seg_len_int / act_seg_len;
             var adj_t_val = t_val * t_adj_val;
             var this_crd = quad_crv.calcCrd(adj_t_val);
 
+            var seg_len = line(mrkrs[i], this_crd).length();
+            if (this_line.a != 0.0) {
+                var secs_sols = quadEq(
+                    (this_line.a * 0.5),
+                    mrkrs[i].spd,
+                    (-1.0 * seg_len)).calcX(0.0);
+                if (secs_sols[0] > 0.0) {
+                    var seg_t = secs_sols[0];
+                }
+                else {
+                    // It is assumed this is positive
+                    var seg_t = secs_sols[1];
+                }
+                //console.log(seg_t);
+                this_crd.spd = mrkrs[i].spd + (this_line.a * seg_t);
+            }
+            else {
+                this_crd.spd = mrkrs[i].spd;
+            }
         }
         else {
             var adj_t_val = 0.0;
-            var this_crd = crds[i]
+            var this_crd = mrkrs[i]
+            if (!init_sp) {
+                this_crd.spd = mrkrs[i+1].spd;
+            }
+            else {
+                this_crd.spd = init_sp;
+            }
         }
-        path_crds.push(this_crd);
+        crv_path.crds.push(this_crd);
         var prev_crd = this_crd;
         var prev_t = adj_t_val;
         adj_t_val += t_step;
@@ -484,18 +606,38 @@ function curvePath(crds) {
 
             if (t <= 1.0) {
                 var this_crd = quad_crv.calcCrd(t);
-                path_crds.push(this_crd);
-                prev_crd = this_crd
+
+                var seg_len = line(prev_crd, this_crd).length();
+                if (this_line.a != 0.0) {
+                    var secs_sols = quadEq(
+                        (this_line.a * 0.5),
+                        prev_crd.spd,
+                        (-1.0 * seg_len)).calcX(0.0);
+                    if (secs_sols[0] > 0.0) {
+                        var seg_t = secs_sols[0];
+                    }
+                    else {
+                        // It is assumed this is positive
+                        var seg_t = secs_sols[1];
+                    }
+                    this_crd.spd = prev_crd.spd + (this_line.a * seg_t);
+                }
+                else {
+                    this_crd.spd = mrkrs[i].spd;
+                }
+
+                crv_path.crds.push(this_crd);
+                prev_crd = this_crd;
                 prev_t = t;
             }
             else {
-                var xtra_end_len = line(prev_crd, crds[i+1]).length();
+                var xtra_end_len = line(prev_crd, mrkrs[i+1]).length();
                 req_seg_len_int = req_seg_len - xtra_end_len;
             }
         }
         percnt_xtr = Number(((t - 1.0) / t_step).toFixed(8));
     }
-    return path_crds
+    return crv_path.crds;
 }
 
 // FUNCTIONS //
@@ -606,4 +748,11 @@ function solveEquations(eq1, eq2) {
         var x = eq1.calcX(y);
     }
     return coord(x, y);
+}
+
+function calcAcceleration(vi, d, t) {
+    return (2 * (d - (vi * t))) / Math.pow(t, 2);
+}
+function calcFinalSp(vi, a, t) {
+    return vi + (a * t);
 }
